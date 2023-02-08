@@ -3,11 +3,8 @@ use std::fs;
 use std::process;
 use std::mem;
 
-/*
 const MIN_CELLS: u32 = 30_000; 
-const MIN_ADD_CELLS: u16 = 500;
-*/
-//let mem: Vec<u8> = vec![0u8; MIN_CELLS as usize];
+const MIN_ADD_CELLS: u16 = 100;
 
 #[derive(Debug)]
 enum Instruction {
@@ -45,7 +42,9 @@ fn main() {
 	}
 	
 	let instructions : Vec<Instruction> = lex_parse(&file_contents);
-	dbg!(instructions);
+	// dbg!(&instructions);
+
+	execute(&instructions);
 }
 
 fn lex_parse(source: &str) -> Vec<Instruction> {
@@ -77,4 +76,28 @@ fn lex_parse(source: &str) -> Vec<Instruction> {
 	}
 	
 	instructs
+}
+
+fn execute(instrs: &Vec<Instruction>) {
+	let mut mem: Vec<u8> = vec![0u8; MIN_CELLS as usize];
+	let mut addr_pntr: usize = (MIN_CELLS/2) as usize;
+
+	// TODO: Finish "Read"
+	for inst in instrs {
+		match inst {
+			Instruction::IncrementPointer => addr_pntr += 1,
+			Instruction::DecrementPointer => addr_pntr -= 1,
+			Instruction::Add => mem[addr_pntr] += 1u8,
+			Instruction::Subtract => mem[addr_pntr] -= 1u8,
+			Instruction::Read => (),
+			Instruction::Write => print!("{}", mem[addr_pntr] as char),
+			Instruction::Loop(repeat) => {
+				while mem[addr_pntr] > 0 {
+					execute(&repeat);
+				}
+			},			
+		};
+
+		//TODO: if approaching the end of vec, add to it.
+	}
 }
