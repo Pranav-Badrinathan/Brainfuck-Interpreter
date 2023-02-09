@@ -1,10 +1,8 @@
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::process;
 use std::mem;
-
-const MIN_CELLS: u32 = 30_000; 
-const MIN_ADD_CELLS: u16 = 100;
 
 #[derive(Debug)]
 enum Instruction {
@@ -48,7 +46,6 @@ fn main() {
 }
 
 fn lex_parse(source: &str) -> Vec<Instruction> {
-
 	let mut instructs: Vec<Instruction> = Vec::new();
 	let mut temp_stack = Vec::new();
 
@@ -79,25 +76,38 @@ fn lex_parse(source: &str) -> Vec<Instruction> {
 }
 
 fn execute(instrs: &Vec<Instruction>) {
-	let mut mem: Vec<u8> = vec![0u8; MIN_CELLS as usize];
-	let mut addr_pntr: usize = (MIN_CELLS/2) as usize;
+	let min_grow_tape: u8 = 100;
+	let mut tape_size: u16 = 30_000;
+	let mut mem_tape: Vec<u8> = vec![0u8; tape_size as usize];
+	let mut addr_pntr: usize = (tape_size/2) as usize;
 
-	// TODO: Finish "Read"
 	for inst in instrs {
 		match inst {
 			Instruction::IncrementPointer => addr_pntr += 1,
 			Instruction::DecrementPointer => addr_pntr -= 1,
-			Instruction::Add => mem[addr_pntr] += 1u8,
-			Instruction::Subtract => mem[addr_pntr] -= 1u8,
-			Instruction::Read => (),
-			Instruction::Write => print!("{}", mem[addr_pntr] as char),
+			Instruction::Add => mem_tape[addr_pntr] += 1u8,
+			Instruction::Subtract => mem_tape[addr_pntr] -= 1u8,
+			Instruction::Read => {
+				let mut read_char = [0u8];
+				if let Err(err) = std::io::stdin().read_exact(&mut read_char) {
+					eprintln!("Failed to read input. Error:{}", err);
+				}
+				mem_tape[addr_pntr] = read_char[0];
+			},
+			Instruction::Write => print!("{}", mem_tape[addr_pntr] as char),
 			Instruction::Loop(repeat) => {
-				while mem[addr_pntr] > 0 {
+				while mem_tape[addr_pntr] > 0 {
 					execute(&repeat);
 				}
 			},			
 		};
+		
+		if addr_pntr == 0 || addr_pntr == mem_tape.len() {
+			tape_size += min_grow_tape as u16;
+			addr_pntr += (min_grow_tape/2) as usize;
 
-		//TODO: if approaching the end of vec, add to it.
+			mem_tape.resize(tape_size as usize, 0);
+			mem_tape.rotate_right((tape_size/2) as usize);
+		}
 	}
 }
