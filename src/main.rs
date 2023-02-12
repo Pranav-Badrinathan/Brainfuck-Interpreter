@@ -41,13 +41,22 @@ fn main() {
 	
 	let instructions : Vec<Instruction> = lex_parse(&file_contents);
 	// dbg!(&instructions);
+	
+	let min_grow_tape: u8 = 100;
+	let mut tape_size: u32 = 30_000;
+	let mut mem_tape: Vec<u8> = vec![0u8; tape_size as usize];
+	let mut addr_pntr: usize = (tape_size/2) as usize;
 
-	execute(&instructions);
+	execute(&instructions, &mut mem_tape, &mut addr_pntr, &mut tape_size, min_grow_tape);
 }
 
 fn lex_parse(source: &str) -> Vec<Instruction> {
 	let mut instructs: Vec<Instruction> = Vec::new();
 	let mut temp_stack = Vec::new();
+
+	if source.matches('[').count() != source.matches(']').count() {
+		eprintln!("Mismatched brackets error: The number of '[' and ']' are not equal!");
+	}
 
 	for token in source.chars() {
 		match token {
@@ -66,7 +75,8 @@ fn lex_parse(source: &str) -> Vec<Instruction> {
 				if let Some(top) = temp_stack.pop() {
 					let looping_insts = mem::replace(&mut instructs, top);
 					instructs.push(Instruction::Loop(looping_insts));
-				}
+				} 
+				// else { eprintln!("Mismatched brackets error: Matching '[' not found!"); } // <- Don't need this anymore!
 			},
 			_ => ()
 		};
@@ -75,39 +85,34 @@ fn lex_parse(source: &str) -> Vec<Instruction> {
 	instructs
 }
 
-fn execute(instrs: &Vec<Instruction>) {
-	let min_grow_tape: u8 = 100;
-	let mut tape_size: u16 = 30_000;
-	let mut mem_tape: Vec<u8> = vec![0u8; tape_size as usize];
-	let mut addr_pntr: usize = (tape_size/2) as usize;
-
+fn execute(instrs: &Vec<Instruction>, mem_tape: &mut Vec<u8>, addr_pntr: &mut usize, tape_size: &mut u32, min_grow_tape: u8) {
 	for inst in instrs {
 		match inst {
-			Instruction::IncrementPointer => addr_pntr += 1,
-			Instruction::DecrementPointer => addr_pntr -= 1,
-			Instruction::Add => mem_tape[addr_pntr] += 1u8,
-			Instruction::Subtract => mem_tape[addr_pntr] -= 1u8,
+			Instruction::IncrementPointer => *addr_pntr += 1,
+			Instruction::DecrementPointer => *addr_pntr -= 1,
+			Instruction::Add => mem_tape[*addr_pntr] = mem_tape[*addr_pntr].wrapping_add(1u8),
+			Instruction::Subtract => mem_tape[*addr_pntr] = mem_tape[*addr_pntr].wrapping_sub(1u8),
 			Instruction::Read => {
 				let mut read_char = [0u8];
 				if let Err(err) = std::io::stdin().read_exact(&mut read_char) {
 					eprintln!("Failed to read input. Error:{}", err);
 				}
-				mem_tape[addr_pntr] = read_char[0];
+				mem_tape[*addr_pntr] = read_char[0];
 			},
-			Instruction::Write => print!("{}", mem_tape[addr_pntr] as char),
+			Instruction::Write => print!("{}", mem_tape[*addr_pntr] as char),
 			Instruction::Loop(repeat) => {
-				while mem_tape[addr_pntr] > 0 {
-					execute(&repeat);
+				while mem_tape[*addr_pntr] != 0 {
+					execute(&repeat, mem_tape, addr_pntr, tape_size, min_grow_tape);
 				}
 			},			
 		};
 		
-		if addr_pntr == 0 || addr_pntr == mem_tape.len() {
-			tape_size += min_grow_tape as u16;
-			addr_pntr += (min_grow_tape/2) as usize;
+		if *addr_pntr == 0 || *addr_pntr == mem_tape.len() {
+			*tape_size += min_grow_tape as u32;
+			*addr_pntr += (min_grow_tape/2) as usize;
 
-			mem_tape.resize(tape_size as usize, 0);
-			mem_tape.rotate_right((tape_size/2) as usize);
+			mem_tape.resize(*tape_size as usize, 0);
+			mem_tape.rotate_right((*tape_size/2) as usize);
 		}
 	}
 }
